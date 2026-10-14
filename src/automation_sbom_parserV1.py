@@ -917,8 +917,8 @@ class AutomationStudioSBOMGenerator:
             if safe_name in self.licence_info:
                 license_info = {
                     "license": {
-                        "name": self.licence_info[safe_name].get("license_name", self.license_name_default),
-                        "url": self.licence_info[safe_name].get("license_url", self.license_url_default)
+                        "name": self.licence_info[safe_name].get("license_name") or self.license_name_default,
+                        "url": self.licence_info[safe_name].get("license_url") or self.license_url_default
                     }
                 }
             else:
