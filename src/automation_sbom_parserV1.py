@@ -6,6 +6,7 @@ Parses an Automation Studio directory and generates a project-specific SBOM.
 """
 
 import json
+import re
 import xml.etree.ElementTree as ET
 from pathlib import Path
 from datetime import datetime, timezone
@@ -108,20 +109,24 @@ class AutomationStudioSBOMGenerator:
         _var_files = self._find_logical_files_by_extension(".var")
         
         for var_file in _var_files:
-            # open file , and search for license_name and license_url 
+            # open file , and search for supplier, license_name and license_url
             for file in _var_files[var_file]:
                 try:
                     with open(file, "r", encoding="utf-8") as f:
                         content = f.read()
+                        supplier = None
                         license_name = None
                         license_url = None
                         for line in content.splitlines():
-                            if line.startswith('"License name":'):
+                            if line.startswith('"Supplier":'):
+                                supplier = line.split(": ")[1].strip('"')
+                            elif line.startswith('"License name":'):
                                 license_name = line.split(": ")[1].strip('"')
                             elif line.startswith('"License URL":'):
                                 license_url = line.split(": ")[1].strip('"')
-                        if license_name or license_url:
+                        if supplier or license_name or license_url:
                             self.licence_info[var_file] = {
+                                "supplier": supplier,
                                 "license_name": license_name,
                                 "license_url": license_url
                             }
@@ -901,6 +906,15 @@ class AutomationStudioSBOMGenerator:
             except ET.ParseError:
                 print(f"  {self.warning}  XML parsing error in {hw_file_path}")
   
+    @staticmethod
+    def _cpe_vendor(supplier: str) -> str:
+        """Convert a supplier name into a CPE vendor value (lowercase, spaces as '_', only a-z, 0-9, '_', '-', '.')."""
+        if supplier == "UNKNOWN":
+            return "UNKNOWN"
+        vendor = re.sub(r"\s+", "_", supplier.strip().lower())
+        vendor = re.sub(r"[^a-z0-9_.\-]", "", vendor)
+        return vendor or "UNKNOWN"
+
     def _add_component(self, config=None, name=None, version=None, comp_type=None, is_br_component=False, description=None):
         """Add a component to the SBOM of the current configuration."""
         
@@ -944,10 +958,12 @@ class AutomationStudioSBOMGenerator:
             component["cpe"] = f"cpe:2.3:a:br-automation:{safe_name}:{version}:*:*:*:*:*:*:*"
             #component["purl"] = f"pkg:br-automation/{safe_name}@{version}"
         else:
-            component["supplier"] = {"name": self.customer_name}
+            # Supplier declared in the library (.var file) has priority over --customer-name
+            supplier = self.licence_info.get(safe_name, {}).get("supplier") or self.customer_name
+            component["supplier"] = {"name": supplier}
             component["description"] = description
-            # Add CPE and PURL 
-            component["cpe"] = f"cpe:2.3:a:UNKNOWN:{safe_name}:{version}:*:*:*:*:*:*:*"
+            # Add CPE and PURL
+            component["cpe"] = f"cpe:2.3:a:{self._cpe_vendor(supplier)}:{safe_name}:{version}:*:*:*:*:*:*:*"
             # component["purl"] = f"pkg:UNKNOWN/{safe_name}@{version}"
 
         self.components[config].append(component)
