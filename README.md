@@ -128,6 +128,7 @@ can also be used to create a Code snippet in AS
 "Variable Decleration Snippets"
 
 The supplier is used as `supplier` and as vendor in the `cpe` of the library and has priority over `--customer-name`.
+User libraries that contain this comment are considered verified by their supplier: their description is taken from the `Description` attribute of the `.lby` file instead of being marked with `TO BE CHECKED BY USER`.
 
 ## Output
 - The script creates one JSON file per configuration in the given output directory or project directory if --output-directory is not provided.

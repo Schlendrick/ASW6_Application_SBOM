@@ -703,14 +703,16 @@ class AutomationStudioSBOMGenerator:
                         lby_file = self.libraries_in_logical_files.get(lib_name)
                         _is_br_component = False
                         _description = f"Software Library: {lib_name} TO BE CHECKED BY USER"
-                        version = "TO BE CHECKED BY USER"   
-                       
+                        version = "TO BE CHECKED BY USER"
+                        lby_description = None
+
                         if lby_file: 
                             try:
                                 # Parse the .lby file
                                 tree = ET.parse(lby_file)
                                 root = tree.getroot()
                                 versionAttribute = root.get("Version", DEFAULT_VERSION_NUMBER)
+                                lby_description = root.get("Description")
                                 #check the found version with the versions from the set of technology libraries from Library_2 folder, if there is a match assign the version from the set instead of the one from the binary.lby file
                                 if lib_name_lower in self.technology_libraries:
                                     versions = self.technology_libraries[lib_name_lower]
@@ -761,14 +763,23 @@ class AutomationStudioSBOMGenerator:
                                     _description=f"B&R VC4 Runtime Library: {lib_name} {version}"
                                 
 
+                        if not _is_br_component:
+                            # A user library that declares its supplier/license in a .var file is considered verified by its supplier
+                            if lby_file and lib_name.replace(" ", "_").replace("/", "-") in self.licence_info:
+                                _description = f"Software Library: {lib_name} {version}"
+                                if lby_description:
+                                    _description += f" - {lby_description}"
+                            else:
+                                _description = f"Software Library: {lib_name} TO BE CHECKED BY USER"
+
                         self._add_component(
                             config=config,
                             name=lib_name,
                             version=version,
                             comp_type=COMP_TYPES["library"],
                             is_br_component=_is_br_component,
-                            description=_description if _is_br_component else f"Software Library: {lib_name} TO BE CHECKED BY USER"
-                        )                       
+                            description=_description
+                        )
 
                         #Show warning, only if there is not default user-licence set
                         if not _is_br_component and self.license_name_default == 'UNKNOWN':
